@@ -29,6 +29,17 @@ class Type(BaseType):
     def format(self, ir):
         return self.name
 
+    def __hash__(self):
+        return hash(self.name)
+    
+    def __eq__(self, other):
+        if not isinstance(other, Type):
+            return False
+        return self.name == other.name
+
+    def __repr__(self):
+        return f"Type({self.name})"
+
 class ValueType(BaseType):
     def __init__(self):
         super().__init__()
@@ -39,10 +50,22 @@ class ValueType(BaseType):
     def format(self, ir):
         return ir.value_type + "*"
 
+    def __hash__(self):
+        return hash("ValueType")
+    
+    def __eq__(self, other):
+        return isinstance(other, ValueType)
+
+    def __repr__(self):
+        return "ValueType()"
+
 class Arg:
     def __init__(self, name, type=None):
         self.name = name
         self.type = type or ValueType()
+
+    def format_formal_arg(self, ir):
+        return self.type.format(ir) + " " + self.name
 
 class Inst:
     def __init__(self, name, args, type, type_checks=None):
@@ -61,6 +84,12 @@ class Inst:
                 snake_case += "_"
             snake_case += char.lower()
         return "build_" + snake_case
+
+    def format_formal_args(self, ir):
+        formal_args = []
+        for arg in self.args:
+            formal_args.append(arg.format_formal_arg(ir))
+        return formal_args
 
 class IR:
     def __init__(self, insts, inst_suffix="Inst", inst_base="Inst", value_type="Value"):
@@ -114,19 +143,18 @@ class InstPlugin:
             code += f"public:\n"
 
             # Constructor
-            ctor_args = []
             init_list = []
             args_init_list = []
             for arg in inst.args:
-                ctor_args.append(f"{arg.type.format(ir)} {arg.name}")
                 if arg.type.is_value():
                     args_init_list.append(arg.name)
                 else:
                     init_list.append(f"_{arg.name}({arg.name})")
             args_init_list = ", ".join(args_init_list)
             init_list = [f"{ir.inst_base}({inst.type}, {{{args_init_list}}})"] + init_list
-            ctor_args = ", ".join(ctor_args)
             init_list = ", ".join(init_list)
+            
+            ctor_args = ", ".join(inst.format_formal_args(ir))
             code += f"  {name}({ctor_args}): {init_list} {{\n"
             for check in inst.type_checks:
                 code += f"    assert({check});\n"
@@ -149,13 +177,8 @@ class BuilderPlugin:
         code = ""
         for inst in ir.insts:
             name = inst.format_name(ir)
-            formal_args = []
-            ctor_args = []
-            for arg in inst.args:
-                formal_args.append(f"{arg.type.format(ir)} {arg.name}")
-                ctor_args.append(arg.name)
-            formal_args = ", ".join(formal_args)
-            ctor_args = ", ".join(ctor_args)
+            formal_args = ", ".join(inst.format_formal_args(ir))
+            ctor_args = ", ".join([arg.name for arg in inst.args])
 
             code += f"{name}* {inst.format_builder_name(ir)}({formal_args}) {{\n"
             code += f"  {name}* inst = new {name}({ctor_args});\n"
@@ -163,6 +186,33 @@ class BuilderPlugin:
             code += f"  return inst;\n"
             code += f"}}\n"
         return {"builder": code}
+
+class CAPIPlugin:
+    def __init__(self, prefix, builder_name, type_substitutions):
+        self.prefix = prefix
+        self.builder_name = builder_name
+        self.type_substitutions = type_substitutions
+
+    def run(self, ir):
+        code = ""
+        code += f"extern \"C\" {{\n"
+        for inst in ir.insts:
+            name = inst.format_name(ir)
+            formal_args = ["void* builder"]
+            build_args = []
+            for arg in inst.args:
+                formal_args.append(f"{self.type_substitutions[arg.type]} {arg.name}")
+                build_args.append(f"({arg.type.format(ir)}) {arg.name}")
+            formal_args = ", ".join(formal_args)
+            build_args = ", ".join(build_args)
+
+            value_type = self.type_substitutions[ValueType()]
+
+            code += f"{value_type} {self.prefix}_{inst.format_builder_name(ir)}({formal_args}) {{\n"
+            code += f"  return ({value_type})(({self.builder_name}*)builder)->{inst.format_builder_name(ir)}({build_args});\n"
+            code += f"}}\n"
+        code += f"}}\n"
+        return {"capi": code}
 
 def lwir(template_path, output_path, ir, plugins):
     with open(template_path, "r") as f:
