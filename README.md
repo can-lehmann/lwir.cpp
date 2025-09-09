@@ -1,6 +1,38 @@
 # LWIR.cpp
 
 Lightweight intermediate representation generator.
+Do you need a quick intermediate representation, but don't want to setup an entire MLIR dialect?
+LWIR might be the solution for you!
+(You definitly don't want to use this for anything serious, go use MLIR for that, I hear its really good.)
+
+IRs are specified in a python script which generates a C++ header:
+
+```python3
+lwir(
+    template_path = "arith.tmpl.hpp",
+    output_path = "arith.hpp",
+    ir = IR(
+	insts = [
+            Inst("Add",
+                args=[Arg("a"), Arg("b")],
+                type="a->type()",
+                type_checks=["a->type() == b->type()"]
+            ),
+            Inst("ConstInt",
+                args=[Arg("value", Type("int"))],
+                type="Type::Int" 
+            )
+	],
+    ),
+    plugins = [
+        InstPlugin([
+            InstGetterPlugin(),
+            InstWritePlugin()
+        ]),
+	BuilderPlugin()
+    ]
+)
+```
 
 ## License
 
