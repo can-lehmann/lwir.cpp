@@ -22,11 +22,22 @@ lwir(
                 args=[Arg("cond"), Arg("a"), Arg("b")],
                 type="a->type()",
                 type_checks=["cond->type() == Type::Bool", "a->type() == b->type()"]
+            ),
+            Inst("ConstInt",
+                args=[Arg("value", Type("int"))],
+                type="Type::Int"
+            ),
+            Inst("ConstBool",
+                args=[Arg("value", Type("bool"))],
+                type="Type::Bool"
             )
         ],
     ),
     plugins = [
-        InstPlugin(),
+        InstPlugin([
+            InstGetterPlugin(),
+            InstWritePlugin()
+        ]),
         BuilderPlugin()
     ]
 )

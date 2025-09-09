@@ -45,17 +45,22 @@ class Arg:
         self.type = type or ValueType()
 
 class Inst:
-    def __init__(self, name, args, type, type_checks):
+    def __init__(self, name, args, type, type_checks=None):
         self.name = name
         self.args = args
         self.type = type
-        self.type_checks = type_checks
+        self.type_checks = type_checks or []
 
     def format_name(self, ir):
         return self.name + ir.inst_suffix
 
     def format_builder_name(self, ir):
-        return "build_" + self.name.lower()
+        snake_case = ""
+        for it, char in enumerate(self.name):
+            if it != 0 and char.isupper():
+                snake_case += "_"
+            snake_case += char.lower()
+        return "build_" + snake_case
 
 class IR:
     def __init__(self, insts, inst_suffix="Inst", inst_base="Inst", value_type="Value"):
@@ -64,14 +69,39 @@ class IR:
         self.inst_base = inst_base
         self.value_type = value_type
 
+class InstGetterPlugin:
+    def run(self, inst, ir):
+        code = ""
+        for arg in inst.args:
+            if not arg.type.is_value():
+                code += f"  {arg.type.format(ir)} {arg.name}() const {{ return _{arg.name}; }}\n"
+        return code
+
+class InstWritePlugin:
+    def run(self, inst, ir):
+        code = ""
+        code += f"  void write(std::ostream& stream) const override {{\n"
+        code += f"    stream << \"{inst.name}\";\n"
+        if len(inst.args) > 0:
+            code += f"    stream << \' \';\n"
+            code += f"    bool is_first = true;\n"
+            code += f"    write_args(stream, is_first);\n"
+            for arg in inst.args:
+                if not arg.type.is_value():
+                    code += f"    if (!is_first) {{ stream << \", \"; }} else {{ is_first = false; }}\n"
+                    code += f"    stream << \"{arg.name}=\";\n"
+                    code += f"    stream << _{arg.name};\n"
+        code += f"  }}\n"
+        return code
+
 class InstPlugin:
-    def __init__(self):
-        pass
+    def __init__(self, plugins):
+        self.plugins = plugins or []
 
     def run(self, ir):
         code = ""
         for inst in ir.insts:
-            name = inst.name + ir.inst_suffix
+            name = inst.format_name(ir)
 
             code += f"class {name} final: public {ir.inst_base} {{\n"
             code += f"private:\n"
@@ -92,7 +122,7 @@ class InstPlugin:
                 if arg.type.is_value():
                     args_init_list.append(arg.name)
                 else:
-                    ctor_args.append(f"_{arg.name}({arg.name})")
+                    init_list.append(f"_{arg.name}({arg.name})")
             args_init_list = ", ".join(args_init_list)
             init_list = [f"{ir.inst_base}({inst.type}, {{{args_init_list}}})"] + init_list
             ctor_args = ", ".join(ctor_args)
@@ -104,10 +134,10 @@ class InstPlugin:
 
             code += "\n"
 
-            # Getters
-            for arg in inst.args:
-                if not arg.type.is_value():
-                    code += f"  {arg.type.format(ir)} {arg.name}() const {{ return _{arg.name}; }}\n"
+            # Plugins
+            for plugin in self.plugins:
+                code += plugin.run(inst, ir)
+
             code += f"}};\n"
         return {"insts": code}
 
