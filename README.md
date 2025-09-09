@@ -14,7 +14,7 @@ lwir(
     template_path = "arith.tmpl.hpp",
     output_path = "arith.hpp",
     ir = IR(
-	insts = [
+        insts = [
             Inst("Add",
                 args=[Arg("a"), Arg("b")],
                 type="a->type()",
@@ -24,14 +24,14 @@ lwir(
                 args=[Arg("value", Type("int"))],
                 type="Type::Int" 
             )
-	],
+        ],
     ),
     plugins = [
         InstPlugin([
             InstGetterPlugin(),
             InstWritePlugin()
         ]),
-	BuilderPlugin()
+        BuilderPlugin()
     ]
 )
 ```
