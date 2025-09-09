@@ -5,6 +5,8 @@ Do you need a quick intermediate representation, but don't want to setup an enti
 LWIR might be the solution for you!
 (You definitly don't want to use this for anything serious, go use MLIR for that, I hear its really good.)
 
+**Warning** LWIR is still in early development.
+
 IRs are specified in a python script which generates a C++ header:
 
 ```python3
