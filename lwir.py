@@ -139,6 +139,9 @@ class InstGetterPlugin:
         return code
 
 class InstWritePlugin:
+    def __init__(self, custom=None):
+        self.custom = custom or {}
+
     def run(self, inst, ir):
         code = ""
         code += f"  void write(std::ostream& stream) const override {{\n"
@@ -151,7 +154,10 @@ class InstWritePlugin:
                 if not arg.type.is_value():
                     code += f"    if (!is_first) {{ stream << \", \"; }} else {{ is_first = false; }}\n"
                     code += f"    stream << \"{arg.name}=\";\n"
-                    code += f"    stream << _{arg.name};\n"
+                    if arg.type in self.custom:
+                        code += "    " + self.custom[arg.type](f"_{arg.name}", "stream") + "\n"
+                    else:
+                        code += f"    stream << _{arg.name};\n"
         code += f"  }}\n"
         return code
 
