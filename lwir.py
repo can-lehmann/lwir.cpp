@@ -171,7 +171,7 @@ class InstPlugin:
             # Attributes
             for arg in inst.args:
                 if not arg.type.is_value():
-                    code += f"  {arg.type.format(ir)} _{arg.name};"
+                    code += f"  {arg.type.format(ir)} _{arg.name};\n"
 
             code += f"public:\n"
 
