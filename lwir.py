@@ -14,6 +14,8 @@
 
 from enum import Enum
 
+Getter = Enum("Getter", ["Default", "Never", "Always"])
+
 class BaseType:
     def __init__(self):
         pass
@@ -59,20 +61,45 @@ class ValueType(BaseType):
     def __repr__(self):
         return "ValueType()"
 
+class VarargsValueType(BaseType):
+    def __init__(self):
+        super().__init__()
+
+    def is_value(self):
+        return True
+
+    def format(self, ir):
+        return "const std::vector<" + ir.value_type + "*>&"
+
+    def __hash__(self):
+        return hash("VarargsValueType")
+    
+    def __eq__(self, other):
+        return isinstance(other, VarargsValueType)
+
+    def __repr__(self):
+        return "VarargsValueType()"
+
+
 class Arg:
-    def __init__(self, name, type=None):
+    def __init__(self, name, type=None, getter=Getter.Default):
         self.name = name
         self.type = type or ValueType()
+        self.getter = getter
+
+        assert isinstance(self.type, BaseType)
 
     def format_formal_arg(self, ir):
         return self.type.format(ir) + " " + self.name
 
 class Inst:
-    def __init__(self, name, args, type, type_checks=None):
+    def __init__(self, name, args, type, type_checks=None, flags=None, base=None):
         self.name = name
         self.args = args
         self.type = type
         self.type_checks = type_checks or []
+        self.flags = flags or set()
+        self.base = base
 
     def format_name(self, ir):
         return self.name + ir.inst_suffix
@@ -101,8 +128,13 @@ class IR:
 class InstGetterPlugin:
     def run(self, inst, ir):
         code = ""
+        value_index = 0
         for arg in inst.args:
-            if not arg.type.is_value():
+            if arg.type.is_value():
+                if arg.getter == Getter.Always:
+                    code += f"  {arg.type.format(ir)} {arg.name}() const {{ return arg({value_index}); }}\n"
+                value_index += 1
+            elif arg.getter != Getter.Never:
                 code += f"  {arg.type.format(ir)} {arg.name}() const {{ return _{arg.name}; }}\n"
         return code
 
@@ -131,8 +163,9 @@ class InstPlugin:
         code = ""
         for inst in ir.insts:
             name = inst.format_name(ir)
+            base = inst.base or ir.inst_base
 
-            code += f"class {name} final: public {ir.inst_base} {{\n"
+            code += f"class {name} final: public {base} {{\n"
             code += f"private:\n"
 
             # Attributes
@@ -146,12 +179,20 @@ class InstPlugin:
             init_list = []
             args_init_list = []
             for arg in inst.args:
-                if arg.type.is_value():
-                    args_init_list.append(arg.name)
-                else:
-                    init_list.append(f"_{arg.name}({arg.name})")
-            args_init_list = ", ".join(args_init_list)
-            init_list = [f"{ir.inst_base}({inst.type}, {{{args_init_list}}})"] + init_list
+                match arg.type:
+                    case VarargsValueType():
+                        assert len(args_init_list) == 0
+                        args_init_list = arg.name
+                    case ValueType():
+                        assert type(args_init_list) == list
+                        args_init_list.append(arg.name)
+                    case Type():
+                        init_list.append(f"_{arg.name}({arg.name})")
+                    case _:
+                        assert False, f"Unknown type: {arg.type}"
+            if type(args_init_list) == list:
+                args_init_list = "{" + ", ".join(args_init_list) + "}"
+            init_list = [f"{base}({inst.type}, {args_init_list})"] + init_list
             init_list = ", ".join(init_list)
             
             ctor_args = ", ".join(inst.format_formal_args(ir))
@@ -201,6 +242,7 @@ class CAPIPlugin:
             formal_args = ["void* builder"]
             build_args = []
             for arg in inst.args:
+                assert not isinstance(arg.type, VarargsValueType), "CAPI does not support varargs"
                 formal_args.append(f"{self.type_substitutions[arg.type]} {arg.name}")
                 build_args.append(f"({arg.type.format(ir)}) {arg.name}")
             formal_args = ", ".join(formal_args)
