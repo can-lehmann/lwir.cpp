@@ -104,13 +104,16 @@ class Inst:
     def format_name(self, ir):
         return self.name + ir.inst_suffix
 
-    def format_builder_name(self, ir):
+    def format_snake_case_name(self, ir):
         snake_case = ""
         for it, char in enumerate(self.name):
             if it != 0 and char.isupper():
                 snake_case += "_"
             snake_case += char.lower()
-        return "build_" + snake_case
+        return snake_case
+
+    def format_builder_name(self, ir):
+        return "build_" + self.format_snake_case_name(ir)
 
     def format_formal_args(self, ir):
         formal_args = []
