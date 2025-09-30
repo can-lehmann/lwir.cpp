@@ -142,12 +142,16 @@ class InstGetterPlugin:
         return code
 
 class InstWritePlugin:
-    def __init__(self, custom=None):
+    def __init__(self, custom=None, custom_args=None):
         self.custom = custom or {}
+        self.custom_args = custom_args or []
 
     def run(self, inst, ir):
+        args = ""
+        for arg in self.custom_args:
+            args += ", " + arg
         code = ""
-        code += f"  void write(std::ostream& stream) const override {{\n"
+        code += f"  void write(std::ostream& stream{args}) const override {{\n"
         code += f"    stream << \"{inst.name}\";\n"
         if len(inst.args) > 0:
             code += f"    stream << \' \';\n"
