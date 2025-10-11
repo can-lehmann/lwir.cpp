@@ -28,6 +28,7 @@ lwir(
     ),
     plugins = [
         InstPlugin([
+            InstConstructorPlugin(),
             InstGetterPlugin(),
             InstWritePlugin()
         ]),

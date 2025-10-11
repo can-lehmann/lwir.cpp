@@ -168,6 +168,42 @@ class InstWritePlugin:
         code += f"  }}\n"
         return code
 
+class InstConstructorPlugin:
+    def __init__(self):
+        pass
+    
+    def run(self, inst, ir):
+        name = inst.format_name(ir)
+        base = inst.base or ir.inst_base
+
+        init_list = []
+        args_init_list = []
+        for arg in inst.args:
+            match arg.type:
+                case VarargsValueType():
+                    assert len(args_init_list) == 0
+                    args_init_list = arg.name
+                case ValueType():
+                    assert type(args_init_list) == list
+                    args_init_list.append(arg.name)
+                case Type():
+                    init_list.append(f"_{arg.name}({arg.name})")
+                case _:
+                    assert False, f"Unknown type: {arg.type}"
+        if type(args_init_list) == list:
+            args_init_list = "{" + ", ".join(args_init_list) + "}"
+        init_list = [f"{base}({inst.type}, {args_init_list})"] + init_list
+        init_list = ", ".join(init_list)
+        
+        ctor_args = ", ".join(inst.format_formal_args(ir))
+        code = f"  {name}({ctor_args}): {init_list} {{\n"
+        for check in inst.type_checks:
+            code += f"    assert({check});\n"
+        code += f"  }}\n"
+
+        code += "\n"
+        return code
+
 class InstPlugin:
     def __init__(self, plugins):
         self.plugins = plugins or []
@@ -188,34 +224,6 @@ class InstPlugin:
 
             code += f"public:\n"
 
-            # Constructor
-            init_list = []
-            args_init_list = []
-            for arg in inst.args:
-                match arg.type:
-                    case VarargsValueType():
-                        assert len(args_init_list) == 0
-                        args_init_list = arg.name
-                    case ValueType():
-                        assert type(args_init_list) == list
-                        args_init_list.append(arg.name)
-                    case Type():
-                        init_list.append(f"_{arg.name}({arg.name})")
-                    case _:
-                        assert False, f"Unknown type: {arg.type}"
-            if type(args_init_list) == list:
-                args_init_list = "{" + ", ".join(args_init_list) + "}"
-            init_list = [f"{base}({inst.type}, {args_init_list})"] + init_list
-            init_list = ", ".join(init_list)
-            
-            ctor_args = ", ".join(inst.format_formal_args(ir))
-            code += f"  {name}({ctor_args}): {init_list} {{\n"
-            for check in inst.type_checks:
-                code += f"    assert({check});\n"
-            code += f"  }}\n"
-
-            code += "\n"
-
             # Plugins
             for plugin in self.plugins:
                 code += plugin.run(inst, ir)
@@ -224,8 +232,8 @@ class InstPlugin:
         return {"insts": code}
 
 class BuilderPlugin:
-    def __init__(self):
-        pass
+    def __init__(self, allocator = None):
+        self.allocator = allocator
 
     def run(self, ir):
         code = ""
@@ -235,7 +243,11 @@ class BuilderPlugin:
             ctor_args = ", ".join([arg.name for arg in inst.args])
 
             code += f"{name}* {inst.format_builder_name(ir)}({formal_args}) {{\n"
-            code += f"  {name}* inst = new {name}({ctor_args});\n"
+            if self.allocator is not None:
+                code += f"  {name}* inst = {self.allocator(inst, ir)};\n"
+                code += f"  new (inst) {name}({ctor_args});\n"
+            else:
+                code += f"  {name}* inst = new {name}({ctor_args});\n"
             code += f"  insert(inst);\n"
             code += f"  return inst;\n"
             code += f"}}\n"
