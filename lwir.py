@@ -204,6 +204,51 @@ class InstConstructorPlugin:
         code += "\n"
         return code
 
+class InstHashPlugin:
+    def run(self, inst, ir):
+        code = ""
+        code += f"  size_t hash() const override {{\n"
+        code += f"    size_t hash = {hash(inst.name)};\n"
+
+        code += f"    hash ^= std::hash<size_t>()(arg_count());\n"
+        code += f"    for (size_t it = 0; it < arg_count(); it++) {{\n"
+        code += f"      hash ^= std::hash<{ir.value_type}*>()(arg(it));\n"
+        code += f"    }}\n"
+
+        for arg in inst.args:
+            if not arg.type.is_value():
+                code += f"    hash ^= std::hash<{arg.type.format(ir)}>()(_{arg.name});\n"
+        
+        code += f"    return hash;\n"
+        code += f"  }}\n"
+
+        return code
+
+class InstEqualsPlugin:
+    def run(self, inst, ir):
+        code = ""
+        code += f"  bool equals(const {ir.value_type}* other) const override {{\n"
+        code += f"    if (this == other) {{ return true; }}\n"
+        code += f"    if (other == nullptr) {{ return false; }}\n"
+        
+        code += f"    if (typeid(*this) != typeid(*other)) {{ return false; }}\n"
+
+        code += f"    const {inst.format_name(ir)}* other_inst = (const {inst.format_name(ir)}*) other;\n"
+
+        code += f"    if (arg_count() != other_inst->arg_count()) {{ return false; }}\n"
+        code += f"    for (size_t it = 0; it < arg_count(); it++) {{\n"
+        code += f"      if (arg(it) != other_inst->arg(it)) {{ return false; }}\n"
+        code += f"    }}\n"
+
+        for arg in inst.args:
+            if not arg.type.is_value():
+                code += f"    if (_{arg.name} != other_inst->_{arg.name}) {{ return false; }}\n"
+
+        code += f"    return true;\n"
+        code += f"  }}\n"
+
+        return code
+
 class InstPlugin:
     def __init__(self, plugins):
         self.plugins = plugins or []
