@@ -142,9 +142,10 @@ class InstGetterPlugin:
         return code
 
 class InstWritePlugin:
-    def __init__(self, custom=None, custom_args=None):
+    def __init__(self, custom=None, custom_args=None, overrides=None):
         self.custom = custom or {}
         self.custom_args = custom_args or []
+        self.overrides = overrides or {}
 
     def run(self, inst, ir):
         args = ""
@@ -152,19 +153,22 @@ class InstWritePlugin:
             args += ", " + arg
         code = ""
         code += f"  void write(std::ostream& stream{args}) const override {{\n"
-        code += f"    stream << \"{inst.name}\";\n"
-        if len(inst.args) > 0:
-            code += f"    stream << \' \';\n"
-            code += f"    bool is_first = true;\n"
-            code += f"    write_args(stream, is_first);\n"
-            for arg in inst.args:
-                if not arg.type.is_value():
-                    code += f"    if (!is_first) {{ stream << \", \"; }} else {{ is_first = false; }}\n"
-                    code += f"    stream << \"{arg.name}=\";\n"
-                    if arg.type in self.custom:
-                        code += "    " + self.custom[arg.type](f"_{arg.name}", "stream") + "\n"
-                    else:
-                        code += f"    stream << _{arg.name};\n"
+        if inst.name in self.overrides:
+            code += self.overrides[inst.name]("stream")
+        else:
+            code += f"    stream << \"{inst.name}\";\n"
+            if len(inst.args) > 0:
+                code += f"    stream << \' \';\n"
+                code += f"    bool is_first = true;\n"
+                code += f"    write_args(stream, is_first);\n"
+                for arg in inst.args:
+                    if not arg.type.is_value():
+                        code += f"    if (!is_first) {{ stream << \", \"; }} else {{ is_first = false; }}\n"
+                        code += f"    stream << \"{arg.name}=\";\n"
+                        if arg.type in self.custom:
+                            code += "    " + self.custom[arg.type](f"_{arg.name}", "stream") + "\n"
+                        else:
+                            code += f"    stream << _{arg.name};\n"
         code += f"  }}\n"
         return code
 
