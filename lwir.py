@@ -82,10 +82,11 @@ class VarargsValueType(BaseType):
 
 
 class Arg:
-    def __init__(self, name, type=None, getter=Getter.Default):
+    def __init__(self, name, type=None, getter=Getter.Default, setter=False):
         self.name = name
         self.type = type or ValueType()
         self.getter = getter
+        self.setter = setter
 
         assert isinstance(self.type, BaseType)
 
@@ -139,6 +140,16 @@ class InstGetterPlugin:
                 value_index += 1
             elif arg.getter != Getter.Never:
                 code += f"  {arg.type.format(ir)} {arg.name}() const {{ return _{arg.name}; }}\n"
+        return code
+
+class InstSetterPlugin:
+    def run(self, inst, ir):
+        code = ""
+        value_index = 0
+        for arg in inst.args:
+            if arg.setter:
+                assert not arg.type.is_value(), "Cannot have setter for value type"
+                code += f"  void set_{arg.name}({arg.type.format(ir)} {arg.name}) {{ _{arg.name} = {arg.name}; }}\n"
         return code
 
 class InstWritePlugin:
