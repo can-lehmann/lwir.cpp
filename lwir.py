@@ -153,21 +153,27 @@ class InstSetterPlugin:
         return code
 
 class InstWritePlugin:
-    def __init__(self, custom=None, custom_args=None, overrides=None):
-        self.custom = custom or {}
+    def __init__(self, custom_args=None, overrides=None, stream_type="std::ostream&"):
         self.custom_args = custom_args or []
         self.overrides = overrides or {}
+        self.stream_type = stream_type
+    
+    def write_name(self, inst, stream):
+        return f"stream << \"{inst.name}\";\n"
+    
+    def write_arg(self, arg, var_name, stream):
+        return f"stream << \"{arg.name}=\" << {var_name};"
 
     def run(self, inst, ir):
         args = ""
         for arg in self.custom_args:
             args += ", " + arg
         code = ""
-        code += f"  void write(std::ostream& stream{args}) const override {{\n"
+        code += f"  void write({self.stream_type} stream{args}) const override {{\n"
         if inst.name in self.overrides:
             code += self.overrides[inst.name]("stream")
         else:
-            code += f"    stream << \"{inst.name}\";\n"
+            code += f"    " + self.write_name(inst, "stream") + ";\n"
             if len(inst.args) > 0:
                 code += f"    stream << \' \';\n"
                 code += f"    bool is_first = true;\n"
@@ -175,11 +181,7 @@ class InstWritePlugin:
                 for arg in inst.args:
                     if not arg.type.is_value():
                         code += f"    if (!is_first) {{ stream << \", \"; }} else {{ is_first = false; }}\n"
-                        code += f"    stream << \"{arg.name}=\";\n"
-                        if arg.type in self.custom:
-                            code += "    " + self.custom[arg.type](f"_{arg.name}", "stream") + "\n"
-                        else:
-                            code += f"    stream << _{arg.name};\n"
+                        code += f"    " + self.write_arg(arg, "_" + arg.name, "stream") + ";\n"
         code += f"  }}\n"
         return code
 
