@@ -185,6 +185,58 @@ class InstWritePlugin:
         code += f"  }}\n"
         return code
 
+class InstWriteJsonPlugin:
+    def __init__(self, stream_type="std::ostream&"):
+        self.stream_type = stream_type
+
+    def escape_json(self, string):
+        escaped = ""
+        ESCAPE = {
+            '\"': "\\\"",
+            '\\': "\\\\",
+            '/' : "\\/",
+            '\n': "\\n",
+            '\t': "\\t",
+            '\r': "\\r"
+        }
+        for char in string:
+            if char in ESCAPE:
+                escaped += ESCAPE[char]
+            else:
+                escaped += char
+        return escaped
+
+    def write_arg(self, arg, var_name, stream):
+        return f"{stream} << {var_name};"
+
+    def write_misc(self):
+        return ""
+
+    def run(self, inst, ir):
+        fields = {
+            "kind": f"stream << \"\\\"{self.escape_json(inst.name)}\\\"\"",
+            "args": "write_args_json(stream)",
+            **self.write_misc("stream")
+        }
+        
+        for arg in inst.args:
+            if not arg.type.is_value():
+                fields[arg.name] = self.write_arg(arg, f"_{arg.name}", "stream")
+
+        code = f"  void write_json({self.stream_type} stream) const override {{\n"
+        code += f"    stream << \"{{\";\n"
+        is_first = True
+        for key, value in fields.items():
+            if not is_first:
+                code += f"    stream << \", \";\n"
+            else:
+                is_first = False
+            code += f"    stream << \"\\\"{self.escape_json(key)}\\\": \";\n"
+            code += f"    {value};\n"
+        code += f"    stream << \"}}\";\n"
+        code += f"  }}"
+        return code
+
 class InstConstructorPlugin:
     def __init__(self):
         pass
