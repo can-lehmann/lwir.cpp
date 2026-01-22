@@ -1,9 +1,6 @@
 # LWIR.cpp
 
 Lightweight intermediate representation generator.
-Do you need a quick intermediate representation, but don't want to setup an entire MLIR dialect?
-LWIR might be the solution for you!
-(You definitly don't want to use this for anything serious, go use MLIR for that, I hear its really good.)
 
 **Warning** LWIR is still in early development.
 
