@@ -94,13 +94,14 @@ class Arg:
         return self.type.format(ir) + " " + self.name
 
 class Inst:
-    def __init__(self, name, args, type, type_checks=None, flags=None, base=None):
+    def __init__(self, name, args, type, type_checks=None, flags=None, base=None, doc=""):
         self.name = name
         self.args = args
         self.type = type
         self.type_checks = type_checks or []
         self.flags = flags or set()
         self.base = base
+        self.doc = doc
 
     def format_name(self, ir):
         return self.name + ir.inst_suffix
