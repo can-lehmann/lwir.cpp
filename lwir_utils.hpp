@@ -64,6 +64,17 @@ namespace lwir {
       _data[index] = value;
       return *this;
     }
+
+    template <class Iterator>
+    Span copy_from(Iterator begin, Iterator end) const {
+      size_t index = 0;
+      for (Iterator iter = begin; iter != end; iter++) {
+        assert(index < _size);
+        _data[index++] = *iter;
+      }
+      assert(index == _size);
+      return *this;
+    }
   };
 
 
