@@ -160,6 +160,32 @@ namespace lwir {
       item->set_next(nullptr);
     }
 
+    void remove(T* first, T* last) {
+      if (first->prev()) {
+        first->prev()->set_next(last->next());
+      } else {
+        _first = last->next();
+      }
+      if (last->next()) {
+        last->next()->set_prev(first->prev());
+      } else {
+        _last = first->prev();
+      }
+      first->set_prev(nullptr);
+      last->set_next(nullptr);
+    }
+
+    void add(T* first, T* last) {
+      assert(!first->prev() && !last->next());
+      first->set_prev(_last);
+      if (_last) {
+        _last->set_next(first);
+      } else {
+        _first = first;
+      }
+      _last = last;
+    }
+
     class iterator {
     private:
       LinkedList* _list;
