@@ -396,7 +396,12 @@ class CAPIPlugin:
         code += f"}}\n"
         return {"capi": code}
 
-def lwir(template_path, output_path, ir, plugins):
+def lwir(template_path,
+         output_path,
+         ir,
+         plugins,
+         placeholder=lambda name: "${" + name + "}"):
+    
     with open(template_path, "r") as f:
         template = f.read()
 
@@ -404,7 +409,7 @@ def lwir(template_path, output_path, ir, plugins):
     for plugin in plugins:
         vars = plugin.run(ir)
         for name, value in vars.items():
-            output = output.replace("${" + name + "}", value)
+            output = output.replace(placeholder(name), value)
 
     with open(output_path, "w") as f:
         f.write(output)
