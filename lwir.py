@@ -406,6 +406,5 @@ def lwir(template_path, output_path, ir, plugins):
         for name, value in vars.items():
             output = output.replace("${" + name + "}", value)
 
-    print(output)
     with open(output_path, "w") as f:
         f.write(output)
