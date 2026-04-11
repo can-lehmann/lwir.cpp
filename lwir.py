@@ -347,8 +347,11 @@ class InstPlugin:
         return {"insts": code}
 
 class BuilderPlugin:
-    def __init__(self, allocator = None):
-        self.allocator = allocator
+    def __init__(self):
+        pass
+
+    def allocator(self, inst, ir):
+        return f"::operator new(sizeof({inst.format_name(ir)}), std::align_val_t(alignof({inst.format_name(ir)})))"
 
     def run(self, ir):
         code = ""
@@ -358,11 +361,8 @@ class BuilderPlugin:
             ctor_args = ", ".join([arg.name for arg in inst.args])
 
             code += f"{name}* {inst.format_builder_name(ir)}({formal_args}) {{\n"
-            if self.allocator is not None:
-                code += f"  {name}* inst = {self.allocator(inst, ir)};\n"
-                code += f"  new (inst) {name}({ctor_args});\n"
-            else:
-                code += f"  {name}* inst = new {name}({ctor_args});\n"
+            code += f"  {name}* inst = {self.allocator(inst, ir)};\n"
+            code += f"  new (inst) {name}({ctor_args});\n"
             code += f"  insert(inst);\n"
             code += f"  return inst;\n"
             code += f"}}\n"
