@@ -351,7 +351,8 @@ class BuilderPlugin:
         pass
 
     def allocator(self, inst, ir):
-        return f"::operator new(sizeof({inst.format_name(ir)}), std::align_val_t(alignof({inst.format_name(ir)})))"
+        name = inst.format_name(ir)
+        return f"(({name}*) ::operator new(sizeof({name}), std::align_val_t(alignof({name}))))"
 
     def run(self, ir):
         code = ""
