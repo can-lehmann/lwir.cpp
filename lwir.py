@@ -280,7 +280,7 @@ class InstHashPlugin:
         code = ""
         code += f"  size_t hash() const override {{\n"
         stable_hash = int.from_bytes(hashlib.sha256(inst.name.encode("utf-8")).digest()[:8], 'little')
-        code += f"    size_t hash = {stable_hash};\n"
+        code += f"    size_t hash = {stable_hash}ULL;\n"
 
         code += f"    hash ^= std::hash<size_t>()(arg_count());\n"
         code += f"    for (size_t it = 0; it < arg_count(); it++) {{\n"
