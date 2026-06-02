@@ -40,7 +40,7 @@ class Type(BaseType):
         return self.name == other.name
 
     def __repr__(self):
-        return f"Type({self.name})"
+        return f"Type({self.name!r})"
 
 class ValueType(BaseType):
     def __init__(self):
@@ -93,6 +93,18 @@ class Arg:
     def format_formal_arg(self, ir):
         return self.type.format(ir) + " " + self.name
 
+    def __repr__(self):
+        typestr = ''
+        if self.type != ValueType():
+            typestr = f', {self.type!r}'
+        gettersetterstr = ''
+        if self.getter is not Getter.Default:
+            gettersetterstr += f', getter={self.getter}'
+        if self.setter != False:
+            gettersetterstr += f', setter={self.setter!r}'
+        return f"Arg({self.name!r}{typestr}{gettersetterstr})"
+
+
 class Inst:
     def __init__(self, name, args, type, type_checks=None, flags=None, base=None, doc=""):
         self.name = name
@@ -122,6 +134,18 @@ class Inst:
         for arg in self.args:
             formal_args.append(arg.format_formal_arg(ir))
         return formal_args
+
+    def __repr__(self):
+        type_check_str = ""
+        if len(self.type_checks) > 0:
+            type_check_str = ", type_checks=[" + ", ".join(repr(x) for x in self.type_checks) + "]"
+        flags_str = ""
+        if len(self.flags) > 0:
+            flags_str = ", flags={" + ", ".join(repr(x) for x in self.flags) + "}"
+        base_str = ""
+        if self.base is not None:
+            base_str = ", base=" + self.base
+        return f"Inst({self.name!r}, {self.args}, {self.type!r}{type_check_str}{flags_str}{base_str})"
 
 class IR:
     def __init__(self, insts, inst_suffix="Inst", inst_base="Inst", value_type="Value"):
