@@ -107,7 +107,7 @@ class Arg:
 
 
 class Inst:
-    def __init__(self, name, args, type, type_checks=None, flags=None, base=None, doc=""):
+    def __init__(self, name, args, type, type_checks=None, flags=None, base=None, doc="", **kwargs):
         self.name = name
         self.args = args
         self.type = type
@@ -115,6 +115,7 @@ class Inst:
         self.flags = flags or set()
         self.base = base
         self.doc = doc
+        self.extra = kwargs
 
     def format_name(self, ir):
         return self.name + ir.inst_suffix
