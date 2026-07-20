@@ -267,6 +267,9 @@ class InstWriteJsonPlugin:
 class InstConstructorPlugin:
     def __init__(self):
         pass
+
+    def emit_type_check(self, check, inst, ir):
+        return f"    assert({check});\n"
     
     def run(self, inst, ir):
         name = inst.format_name(ir)
@@ -294,7 +297,7 @@ class InstConstructorPlugin:
         ctor_args = ", ".join(inst.format_formal_args(ir))
         code = f"  {name}({ctor_args}): {init_list} {{\n"
         for check in inst.type_checks:
-            code += f"    assert({check});\n"
+            code += self.emit_type_check(check, inst, ir)
         code += f"  }}\n"
 
         code += "\n"
