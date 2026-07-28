@@ -259,4 +259,100 @@ namespace lwir {
     Range<iterator> range() { return Range<iterator>(begin(), end()); }
     Range<reverse_iterator> rev_range() { return Range<reverse_iterator>(rbegin(), rend()); }
   };
+
+  template <class Block>
+  class DefaultBlockMap {
+  public:
+    template <class T>
+    class Map {
+    private:
+      std::unordered_map<Block*, T> _map;
+    public:
+      Map() {}
+      Map(size_t) {}
+
+      T& at(Block* block) { return _map[block]; }
+      T& operator[](Block* block) { return _map[block]; }
+    };
+  };
+
+  template <class Self, class Block, template <class> class BlockMap = DefaultBlockMap<Block>::template Map>
+  class DominatorTreeBase {
+  private:
+    size_t _block_count;
+    BlockMap<Block*> _idom;
+
+    std::vector<Block*> successors(Block* block) {
+      return static_cast<Self*>(this)->successors(block);
+    }
+
+    void traverse(Block* block,
+                  BlockMap<std::vector<Block*>>& incoming,
+                  std::vector<Block*>& post_order,
+                  BlockMap<size_t>& nums) {
+      assert(block);
+      for (Block* succ : successors(block)) {
+        if (!_idom[succ]) {
+          _idom[succ] = block;
+          traverse(succ, incoming, post_order, nums);
+        }
+        incoming[succ].push_back(block);
+      }
+      nums[block] = post_order.size();
+      post_order.push_back(block);
+    }
+
+  protected:
+    DominatorTreeBase(size_t block_count): _block_count(block_count), _idom(block_count) {}
+
+    // Loosely based on ideas from Keith D. Cooper, Timothy J. Harvey,
+    // and Ken Kennedy "A Simple, Fast Dominance Algorithm"
+    void build(Block* entry) {
+      BlockMap<std::vector<Block*>> incoming(_block_count);
+      std::vector<Block*> post_order;
+      BlockMap<size_t> nums(_block_count);
+
+      traverse(entry, incoming, post_order, nums);
+
+      post_order.pop_back();
+
+      bool changed = true;
+      while (changed) {
+        changed = false;
+
+        for (size_t it = post_order.size(); it-- > 0; ) {
+          Block* block = post_order[it];
+
+          Block* idom = _idom[block];
+          assert(idom);
+          for (Block* pred : incoming[block]) {
+            while (pred != idom) {
+              if (nums[pred] < nums[idom]) {
+                pred = _idom[pred];
+              } else {
+                idom = _idom[idom];
+              }
+            }
+          }
+
+          if (idom != _idom[block]) {
+            _idom[block] = idom;
+            changed = true;
+          }
+        }
+      }
+    }
+
+  public:
+    Block* idom(Block* block) {
+      return _idom[block];
+    }
+
+    bool dominates(Block* dominator, Block* dominated) {
+      while (dominated && dominated != dominator) {
+        dominated = idom(dominated);
+      }
+      return dominated == dominator;
+    }
+  };
 }
