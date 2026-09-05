@@ -355,4 +355,99 @@ namespace lwir {
       return dominated == dominator;
     }
   };
+
+  template <class Self, class T>
+  class BaseFlags {
+  protected:
+    T _flags = 0;
+  public:
+    BaseFlags(T flags = 0): _flags(flags) {}
+
+    explicit operator T() const {
+      return _flags;
+    }
+
+    explicit operator uint64_t() const {
+      return _flags;
+    }
+
+    bool has(Self flag) const {
+      return (_flags & flag._flags) != 0;
+    }
+
+    bool operator==(const Self& other) const {
+      return _flags == other._flags;
+    }
+
+    bool operator!=(const Self& other) const {
+      return !(*this == other);
+    }
+
+    Self operator|(const Self& other) const {
+      return Self(_flags | other._flags);
+    }
+
+    Self& operator|=(const Self& other) {
+      _flags |= other._flags;
+      return (Self&) *this;
+    }
+
+    class name_iterator {
+    private:
+      size_t _index = 0;
+      Self _flags;
+    public:
+      name_iterator(Self flags): _index(0), _flags(flags) {}
+      name_iterator(Self flags, size_t index): _index(index), _flags(flags) {}
+
+      const char* operator*() const {
+        assert(_index < Self::COUNT);
+        return Self::NAMES[_index];
+      }
+
+      name_iterator& operator++() {
+        do {
+          _index++;
+        } while (_index < Self::COUNT && !_flags.has(Self(1 << _index)));
+        return *this;
+      }
+
+      bool operator==(const name_iterator& other) const {
+        return _index == other._index && _flags == other._flags;
+      }
+
+      bool operator!=(const name_iterator& other) const {
+        return !(*this == other);
+      }
+    };
+
+    Range<name_iterator> names() const {
+      return Range<name_iterator>(
+        name_iterator(*((Self*) this)),
+        name_iterator(*((Self*) this), Self::COUNT)
+      );
+    }
+
+    void write(std::ostream& stream) const {
+      stream << "{";
+      bool is_first = true;
+      for (const char* name : names()) {
+        if (!is_first) { stream << ", "; }
+        is_first = false;
+        stream << name;
+      }
+      stream << "}";
+    }
+
+    void write_json(std::ostream& stream) const {
+      stream << "[";
+      bool is_first = true;
+      for (const char* name : names()) {
+        if (!is_first) { stream << ", "; }
+        is_first = false;
+        stream << "\"" << name << "\"";
+      }
+      stream << "]";
+    }
+  };
 }
