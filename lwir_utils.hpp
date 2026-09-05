@@ -360,6 +360,15 @@ namespace lwir {
   class BaseFlags {
   protected:
     T _flags = 0;
+
+    T mask() const {
+      if (Self::COUNT == sizeof(T) * 8) {
+        return (T) -1;
+      } else {
+        assert(Self::COUNT < sizeof(T) * 8);
+        return (T(1) << Self::COUNT) - 1;
+      }
+    }
   public:
     BaseFlags(T flags = 0): _flags(flags) {}
 
@@ -390,6 +399,19 @@ namespace lwir {
     Self& operator|=(const Self& other) {
       _flags |= other._flags;
       return (Self&) *this;
+    }
+
+    Self operator&(const Self& other) const {
+      return Self(_flags & other._flags);
+    }
+
+    Self& operator&=(const Self& other) {
+      _flags &= other._flags;
+      return (Self&) *this;
+    }
+
+    Self operator~() const {
+      return Self(~_flags & mask());
     }
 
     class name_iterator {
