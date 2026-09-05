@@ -396,8 +396,16 @@ namespace lwir {
     private:
       size_t _index = 0;
       Self _flags;
+
+      void advance() {
+        while (_index < Self::COUNT && !_flags.has(Self(1 << _index))) {
+          _index++;
+        }
+      }
     public:
-      name_iterator(Self flags): _index(0), _flags(flags) {}
+      name_iterator(Self flags): _index(0), _flags(flags) {
+        advance();
+      }
       name_iterator(Self flags, size_t index): _index(index), _flags(flags) {}
 
       const char* operator*() const {
@@ -406,9 +414,8 @@ namespace lwir {
       }
 
       name_iterator& operator++() {
-        do {
-          _index++;
-        } while (_index < Self::COUNT && !_flags.has(Self(1 << _index)));
+        _index++;
+        advance();
         return *this;
       }
 
