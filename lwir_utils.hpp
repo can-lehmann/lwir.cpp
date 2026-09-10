@@ -379,6 +379,10 @@ namespace lwir {
       return static_cast<Self*>(this)->successors(block);
     }
 
+    std::vector<Block*> blocks() {
+      return static_cast<Self*>(this)->blocks();
+    }
+
     void traverse(Block* block,
                   BlockMap<std::vector<Block*>>& incoming,
                   std::vector<Block*>& post_order,
@@ -446,6 +450,53 @@ namespace lwir {
         dominated = idom(dominated);
       }
       return dominated == dominator;
+    }
+
+    // parents before children
+    std::vector<Block*> order() {
+      std::vector<Block*> order;
+      std::set<Block*> closed;
+      order.reserve(_block_count);
+      for (Block* block : blocks()) {
+        size_t index = order.size();
+        while (block && closed.find(block) == closed.end()) {
+          closed.insert(block);
+          order.push_back(block);
+          block = idom(block);
+        }
+        std::reverse(order.begin() + index, order.end());
+      }
+      return order;
+    }
+
+    // children before parents
+    std::vector<Block*> rev_order() {
+      std::vector<Block*> order = this->order();
+      std::reverse(order.begin(), order.end());
+      return order;
+    }
+
+    std::unordered_map<Block*, std::set<Block*>> frontiers() {
+      std::unordered_map<Block*, std::set<Block*>> frontiers;
+      for (Block* block : rev_order()) {
+        frontiers[block];
+
+        for (Block* succ : successors(block)) {
+          if (block != idom(succ)) {
+            frontiers[block].insert(succ);
+          }
+        }
+
+        Block* idom = this->idom(block);
+        if (idom) {
+          for (Block* frontier : frontiers[block]) {
+            if (this->idom(frontier) != idom) {
+              frontiers[idom].insert(frontier);
+            }
+          }
+        }
+      }
+      return frontiers;
     }
   };
 
