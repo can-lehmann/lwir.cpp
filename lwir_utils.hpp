@@ -387,16 +387,33 @@ namespace lwir {
                   BlockMap<std::vector<Block*>>& incoming,
                   std::vector<Block*>& post_order,
                   BlockMap<size_t>& nums) {
+      struct Frame {
+        Block* block;
+        std::vector<Block*> successors;
+        size_t successor_index = 0;
+      };
       assert(block);
-      for (Block* succ : successors(block)) {
-        if (!_idom[succ]) {
-          _idom[succ] = block;
-          traverse(succ, incoming, post_order, nums);
+      std::vector<Frame> stack;
+      stack.push_back({block, successors(block)});
+      while (!stack.empty()) {
+        Frame& frame = stack.back();
+        if (frame.successor_index == frame.successors.size()) {
+          //...  end
+          nums[frame.block] = post_order.size();
+          post_order.push_back(frame.block);
+          stack.pop_back();
+        } else {
+          // what happens in the for loop
+          Block* succ = frame.successors.at(frame.successor_index);
+          if (!_idom[succ]) {
+            _idom[succ] = frame.block;
+            stack.push_back({succ, successors(succ)});
+          } else {
+            incoming[succ].push_back(frame.block);
+            frame.successor_index++;
+          }
         }
-        incoming[succ].push_back(block);
       }
-      nums[block] = post_order.size();
-      post_order.push_back(block);
     }
 
   protected:
