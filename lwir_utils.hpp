@@ -398,12 +398,10 @@ namespace lwir {
       while (!stack.empty()) {
         Frame& frame = stack.back();
         if (frame.successor_index == frame.successors.size()) {
-          //...  end
           nums[frame.block] = post_order.size();
           post_order.push_back(frame.block);
           stack.pop_back();
         } else {
-          // what happens in the for loop
           Block* succ = frame.successors.at(frame.successor_index);
           if (!_idom[succ]) {
             _idom[succ] = frame.block;
