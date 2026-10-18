@@ -383,7 +383,7 @@ namespace lwir {
       return static_cast<Self*>(this)->blocks();
     }
 
-    void traverse(Block* block,
+    void traverse(Block* entry,
                   BlockMap<std::vector<Block*>>& incoming,
                   std::vector<Block*>& post_order,
                   BlockMap<size_t>& nums) {
@@ -392,9 +392,9 @@ namespace lwir {
         std::vector<Block*> successors;
         size_t successor_index = 0;
       };
-      assert(block);
+      assert(entry);
       std::vector<Frame> stack;
-      stack.push_back({block, successors(block)});
+      stack.push_back({entry, successors(entry)});
       while (!stack.empty()) {
         Frame& frame = stack.back();
         if (frame.successor_index == frame.successors.size()) {
@@ -403,7 +403,7 @@ namespace lwir {
           stack.pop_back();
         } else {
           Block* succ = frame.successors.at(frame.successor_index);
-          if (!_idom[succ]) {
+          if (!_idom[succ] && succ != entry) {
             _idom[succ] = frame.block;
             stack.push_back({succ, successors(succ)});
           } else {
