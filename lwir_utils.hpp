@@ -18,6 +18,12 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <algorithm>
+#include <functional>
+#include <iterator>
+#include <new>
+#include <type_traits>
+#include <utility>
 
 namespace lwir {
   class ArenaAllocator {
@@ -641,24 +647,47 @@ namespace lwir {
 
   template <class T, class Less = std::less<T>>
   class ArraySet {
+    static_assert(std::is_trivially_copyable_v<T> && std::is_trivially_destructible_v<T>);
+    static_assert(sizeof(T) <= sizeof(T*));
   private:
     size_t _size = 0;
     union {
       T _item;
       T* _ptr = nullptr;
     };
+
+    static bool equivalent(const T& left, const T& right) {
+      return !Less()(left, right) && !Less()(right, left);
+    }
   public:
     ArraySet() {}
     ArraySet(T item): _size(1), _item(item) {}
 
     template <class Iterator>
-    ArraySet(Iterator begin, Iterator end): _size(std::distance(begin, end)) {
-      if (_size == 1) {
-        _item = *begin;
-      } else if (_size > 1) {
-        _ptr = new T[_size];
-        std::copy(begin, end, _ptr);
-        std::sort(_ptr, _ptr + _size, Less());
+    static ArraySet from_unique(Iterator begin, Iterator end) {
+      ArraySet result;
+      result._size = std::distance(begin, end);
+      if (result._size == 1) {
+        result._item = *begin;
+      } else if (result._size > 1) {
+        result._ptr = new T[result._size];
+        std::copy(begin, end, result._ptr);
+        std::sort(result._ptr, result._ptr + result._size, Less());
+      }
+      return result;
+    }
+
+    ArraySet(const ArraySet& left, const ArraySet& right) {
+      if (left.empty()) {
+        *this = right;
+      } else if (right.empty()) {
+        *this = left;
+      } else if (left.size() == 1 && right.size() == 1 && equivalent(left._item, right._item)) {
+        _size = 1;
+        _item = left._item;
+      } else {
+        _ptr = new T[left.size() + right.size()];
+        _size = std::set_union(left.begin(), left.end(), right.begin(), right.end(), _ptr, Less()) - _ptr;
       }
     }
 
@@ -671,7 +700,7 @@ namespace lwir {
       }
     }
 
-    ArraySet(ArraySet&& other): _size(other._size) {
+    ArraySet(ArraySet&& other) noexcept: _size(other._size) {
       if (_size == 1) {
         _item = std::move(other._item);
       } else if (_size > 1) {
@@ -683,13 +712,13 @@ namespace lwir {
 
     ArraySet& operator=(const ArraySet& other) {
       if (this != &other) {
-        this->~ArraySet();
-        new (this) ArraySet(other);
+        ArraySet copy(other);
+        *this = std::move(copy);
       }
       return *this;
     }
 
-    ArraySet& operator=(ArraySet&& other) {
+    ArraySet& operator=(ArraySet&& other) noexcept {
       if (this != &other) {
         this->~ArraySet();
         new (this) ArraySet(std::move(other));
@@ -704,6 +733,20 @@ namespace lwir {
     }
 
     size_t size() const { return _size; }
+    bool empty() const { return _size == 0; }
+
+    const T* begin() const { return _size > 1 ? _ptr : &_item; }
+    const T* end() const { return begin() + _size; }
+
+    bool contains(const ArraySet& other) const {
+      return _size >= other._size && std::includes(begin(), end(), other.begin(), other.end(), Less());
+    }
+
+    bool operator==(const ArraySet& other) const {
+      return _size == other._size && std::equal(begin(), end(), other.begin(), equivalent);
+    }
+
+    bool operator!=(const ArraySet& other) const { return !(*this == other); }
 
     T at(size_t index) const {
       assert(index < _size);
