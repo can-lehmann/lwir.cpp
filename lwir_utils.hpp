@@ -638,4 +638,80 @@ namespace lwir {
       stream << "]";
     }
   };
+
+  template <class T, class Less = std::less<T>>
+  class ArraySet {
+  private:
+    size_t _size = 0;
+    union {
+      T _item;
+      T* _ptr = nullptr;
+    };
+  public:
+    ArraySet() {}
+    ArraySet(T item): _size(1), _item(item) {}
+
+    template <class Iterator>
+    ArraySet(Iterator begin, Iterator end): _size(std::distance(begin, end)) {
+      if (_size == 1) {
+        _item = *begin;
+      } else if (_size > 1) {
+        _ptr = new T[_size];
+        std::copy(begin, end, _ptr);
+        std::sort(_ptr, _ptr + _size, Less());
+      }
+    }
+
+    ArraySet(const ArraySet& other): _size(other._size) {
+      if (_size == 1) {
+        _item = other._item;
+      } else if (_size > 1) {
+        _ptr = new T[_size];
+        std::copy(other._ptr, other._ptr + _size, _ptr);
+      }
+    }
+
+    ArraySet(ArraySet&& other): _size(other._size) {
+      if (_size == 1) {
+        _item = std::move(other._item);
+      } else if (_size > 1) {
+        _ptr = other._ptr;
+        other._ptr = nullptr;
+      }
+      other._size = 0;
+    }
+
+    ArraySet& operator=(const ArraySet& other) {
+      if (this != &other) {
+        this->~ArraySet();
+        new (this) ArraySet(other);
+      }
+      return *this;
+    }
+
+    ArraySet& operator=(ArraySet&& other) {
+      if (this != &other) {
+        this->~ArraySet();
+        new (this) ArraySet(std::move(other));
+      }
+      return *this;
+    }
+
+    ~ArraySet() {
+      if (_size > 1) {
+        delete[] _ptr;
+      }
+    }
+
+    size_t size() const { return _size; }
+
+    T at(size_t index) const {
+      assert(index < _size);
+      if (_size == 1) {
+        return _item;
+      } else {
+        return _ptr[index];
+      }
+    }
+  };
 }
