@@ -26,6 +26,17 @@
 #include <utility>
 
 namespace lwir {
+  // Adapted from CityHash's Hash128to64, Copyright (c) 2011 Google, Inc.
+  // Licensed under MIT. See THIRD_PARTY_LICENSES.txt for the full notice.
+  inline uint64_t hash_16_bytes(uint64_t hash, uint64_t word) {
+    constexpr uint64_t magic = 0x9ddfea08eb382d69ULL;
+    uint64_t a = (hash ^ word) * magic;
+    a ^= a >> 47;
+    uint64_t b = (word ^ a) * magic;
+    b ^= b >> 47;
+    return b * magic;
+  }
+
   class ArenaAllocator {
   private:
     struct Chunk {

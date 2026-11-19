@@ -107,7 +107,7 @@ class Arg:
 
 
 class Inst:
-    def __init__(self, name, args, type, type_checks=None, flags=None, base=None, doc="", **kwargs):
+    def __init__(self, name, args, type, type_checks=None, flags=None, base=None, doc="", commutative=False, **kwargs):
         self.name = name
         self.args = args
         self.type = type
@@ -115,7 +115,10 @@ class Inst:
         self.flags = flags or set()
         self.base = base
         self.doc = doc
+        self.commutative = commutative
         self.extra = kwargs
+        if commutative:
+            assert [arg.type for arg in args] == [ValueType(), ValueType()]
 
     def format_name(self, ir):
         return self.name + ir.inst_suffix
@@ -147,7 +150,8 @@ class Inst:
         base_str = ""
         if self.base is not None:
             base_str = ", base=" + self.base
-        return f"Inst({self.name!r}, {self.args}, {self.type!r}{type_check_str}{flags_str}{base_str})"
+        commutative_str = ", commutative=True" if self.commutative else ""
+        return f"Inst({self.name!r}, {self.args}, {self.type!r}{type_check_str}{flags_str}{base_str}{commutative_str})"
 
 class IR:
     def __init__(self, insts, inst_suffix="Inst", inst_base="Inst", value_type="Value"):
@@ -308,21 +312,35 @@ class InstHashPlugin:
         code = ""
         code += f"  size_t hash() const override {{\n"
         stable_hash = int.from_bytes(hashlib.sha256(inst.name.encode("utf-8")).digest()[:8], 'little')
-        code += f"    size_t hash = {stable_hash}ULL;\n"
+        code += f"    uint64_t hash = lwir::hash_16_bytes({stable_hash}ULL, arg_count());\n"
 
-        code += f"    hash ^= std::hash<size_t>()(arg_count());\n"
-        code += f"    for (size_t it = 0; it < arg_count(); it++) {{\n"
-        code += f"      hash ^= std::hash<{ir.value_type}*>()(arg(it));\n"
-        code += f"    }}\n"
+        if inst.commutative:
+            code += f"    size_t a = std::hash<{ir.value_type}*>()(arg(0));\n"
+            code += f"    size_t b = std::hash<{ir.value_type}*>()(arg(1));\n"
+            code += "    hash = lwir::hash_16_bytes(hash, std::min(a, b));\n"
+            code += "    hash = lwir::hash_16_bytes(hash, std::max(a, b));\n"
+        else:
+            code += f"    for (size_t it = 0; it < arg_count(); it++) {{\n"
+            code += f"      hash = lwir::hash_16_bytes(hash, std::hash<{ir.value_type}*>()(arg(it)));\n"
+            code += f"    }}\n"
 
         for arg in inst.args:
             if not arg.type.is_value():
-                code += f"    hash ^= std::hash<{arg.type.format(ir)}>()(_{arg.name});\n"
+                code += f"    hash = lwir::hash_16_bytes(hash, std::hash<{arg.type.format(ir)}>()(_{arg.name}));\n"
         
         code += f"    return hash;\n"
         code += f"  }}\n"
 
         return code
+
+class InstCommutativityPlugin:
+    def run(self, ir):
+        checks = [
+            f"dynamic_cast<const {inst.format_name(ir)}*>(this)"
+            for inst in ir.insts
+            if inst.commutative
+        ]
+        return {"commutative_checks": " ||\n           ".join(checks) or "false"}
 
 class InstEqualsPlugin:
     def run(self, inst, ir):
