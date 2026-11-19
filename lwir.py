@@ -304,20 +304,24 @@ class InstConstructorPlugin:
         return code
 
 class InstHashPlugin:
+    def hash_operands(self, inst, ir):
+        return (
+            f"    for (size_t it = 0; it < arg_count(); it++) {{\n"
+            f"      hash = lwir::hash_16_bytes(hash, std::hash<{ir.value_type}*>()(arg(it)));\n"
+            f"    }}\n"
+        )
+
     def run(self, inst, ir):
         code = ""
         code += f"  size_t hash() const override {{\n"
         stable_hash = int.from_bytes(hashlib.sha256(inst.name.encode("utf-8")).digest()[:8], 'little')
-        code += f"    size_t hash = {stable_hash}ULL;\n"
+        code += f"    uint64_t hash = lwir::hash_16_bytes({stable_hash}ULL, arg_count());\n"
 
-        code += f"    hash ^= std::hash<size_t>()(arg_count());\n"
-        code += f"    for (size_t it = 0; it < arg_count(); it++) {{\n"
-        code += f"      hash ^= std::hash<{ir.value_type}*>()(arg(it));\n"
-        code += f"    }}\n"
+        code += self.hash_operands(inst, ir)
 
         for arg in inst.args:
             if not arg.type.is_value():
-                code += f"    hash ^= std::hash<{arg.type.format(ir)}>()(_{arg.name});\n"
+                code += f"    hash = lwir::hash_16_bytes(hash, std::hash<{arg.type.format(ir)}>()(_{arg.name}));\n"
         
         code += f"    return hash;\n"
         code += f"  }}\n"
