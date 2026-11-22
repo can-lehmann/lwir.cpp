@@ -83,16 +83,20 @@ class VarargsValueType(BaseType):
 
 
 class Arg:
-    def __init__(self, name, type=None, getter=Getter.Default, setter=False):
+    def __init__(self, name, type=None, getter=Getter.Default, setter=False, default: str = ""):
         self.name = name
         self.type = type or ValueType()
         self.getter = getter
         self.setter = setter
+        self.default = default
 
         assert isinstance(self.type, BaseType)
 
     def format_formal_arg(self, ir):
-        return self.type.format(ir) + " " + self.name
+        formal_arg = self.type.format(ir) + " " + self.name
+        if self.default:
+            formal_arg += f" = {self.default}"
+        return formal_arg
 
     def __repr__(self):
         typestr = ''
@@ -103,7 +107,10 @@ class Arg:
             gettersetterstr += f', getter={self.getter}'
         if self.setter != False:
             gettersetterstr += f', setter={self.setter!r}'
-        return f"Arg({self.name!r}{typestr}{gettersetterstr})"
+        defaultstr = ""
+        if self.default:
+            defaultstr = f", default={self.default!r}"
+        return f"Arg({self.name!r}{typestr}{gettersetterstr}{defaultstr})"
 
 
 class Inst:
